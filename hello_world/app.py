@@ -1,42 +1,105 @@
+import boto3
 import json
+import os
+import requests
+from typing import List, Dict
 
-# import requests
+cfn = boto3.client('cloudformation')
 
+NOTIFY_SLACK_URL = os.environ['NOTIFY_SLACK_URL']
 
-def lambda_handler(event, context):
-    """Sample pure Lambda function
+def lambda_handler(event, context) -> None:
+    # スタック一覧を取得する
+    stacks = get_stacks()
 
-    Parameters
-    ----------
-    event: dict, required
-        API Gateway Lambda Proxy Input Format
+    # 各スタックのリソース数を調べる
+    result = []
+    for stack in stacks:
+        stack_name = stack['StackName']
+        resources = get_stack_resources(stack_name)
+        result.append({
+            'StackName': stack_name,
+            'ResourceCount': len(resources)
+        })
 
-        Event doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format
+    # 通知用のメッセージを作成する
+    message = create_message(stacks, result)
 
-    context: object, required
-        Lambda Context runtime methods and attributes
+    # メッセージがあるならSlackに通知する
+    if message != '':
+        post_slack(message)
 
-        Context doc: https://docs.aws.amazon.com/lambda/latest/dg/python-context-object.html
-
-    Returns
-    ------
-    API Gateway Lambda Proxy Output Format: dict
-
-        Return doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html
-    """
-
-    # try:
-    #     ip = requests.get("http://checkip.amazonaws.com/")
-    # except requests.RequestException as e:
-    #     # Send some context about this error to Lambda Logs
-    #     print(e)
-
-    #     raise e
-
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "message": "hello world",
-            # "location": ip.text.replace("\n", "")
-        }),
+def get_stacks(token: str=None) -> List[Dict]:
+    """スタック一覧を取得する"""
+    option = {
+        'StackStatusFilter': ['CREATE_COMPLETE']
     }
+
+    if token is not None:
+        option['NextToken'] = token
+
+    res = cfn.list_stacks(**option)
+    stacks = res.get('StackSummaries', [])
+
+    if 'NextToken' in res:
+        stacks += get_stacks(res['NextToken'])
+    return stacks
+
+def get_stack_resources(stack_name: str, token: str=None) -> List[Dict]:
+    """指定したスタックのリソース一覧を取得する"""
+    option = {
+        'StackName': stack_name
+    }
+
+    if token is not None:
+        option['NextToken'] = token
+
+    res = cfn.list_stack_resources(**option)
+    resources = res.get('StackResourceSummaries', [])
+
+    if 'NextToken' in res:
+        resources += get_stack_resources(res['NextToken'])
+    return resources
+
+def create_message(stacks: List[Dict], result: List[Dict]) -> str:
+    """メッセージを作成する"""
+    # リソース数が多い順に並び替えてメッセージを作成する
+    message = []
+    for item in sorted(result, key=lambda x:x['ResourceCount'], reverse=True):
+        stack_name = item['StackName']
+        resource_count = item['ResourceCount']
+        message.append(f'- {resource_count:3}: {stack_name}')
+    return '\n'.join(message)
+
+def post_slack(message: str) -> None:
+    """SlackにメッセージをPOSTする"""
+    # https://api.slack.com/tools/block-kit-builder
+    payload = {
+        'blocks': [
+            {
+                'type': 'section',
+                'text': {
+                    'type': 'mrkdwn',
+                    'text': f'CloudFormation Resource Count.'
+                }
+            },
+            {
+                'type': 'context',
+                'elements': [
+                    {
+                        'type': 'mrkdwn',
+                        'text': message
+                    }
+                ]
+            }
+        ]
+    }
+ 
+    # http://requests-docs-ja.readthedocs.io/en/latest/user/quickstart/
+    try:
+        response = requests.post(f'https://{NOTIFY_SLACK_URL}', data=json.dumps(payload))
+    except requests.exceptions.RequestException as e:
+        print(e)
+        raise
+    else:
+        print(response.status_code)
