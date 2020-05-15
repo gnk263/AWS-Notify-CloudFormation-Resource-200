@@ -1,7 +1,6 @@
 BUCKET_NAME := gnk263-sam-bucket
 STACK_NAME := Notify-CloudFormation-Resource-Stack
 NOTIFY_SLACK_URL_KEY := /Slack/INCOMING_WEBHOOK_URL/CloudFormationResource
-RESOURCE_THRESHOLD_KEY := /Slack/CloudFormation/Resource/Threshold
 
 build:
 	sam build
@@ -17,5 +16,4 @@ deploy:
 		--capabilities CAPABILITY_NAMED_IAM \
 		--no-fail-on-empty-changeset \
 		--parameter-overrides \
-			NotifySlackUrl=$(NOTIFY_SLACK_URL_KEY) \
-			ResourceThreshold=$(RESOURCE_THRESHOLD_KEY)
+			NotifySlackUrl=$(NOTIFY_SLACK_URL_KEY)
