@@ -25,9 +25,8 @@ def lambda_handler(event, context) -> None:
     # 通知用のメッセージを作成する
     message = create_message(stacks, result)
 
-    # メッセージがあるならSlackに通知する
-    if message != '':
-        post_slack(message)
+    # メッセージをSlackに通知する
+    post_slack(message)
 
 def get_stacks(token: str=None) -> List[Dict]:
     """スタック一覧を取得する"""
@@ -69,6 +68,9 @@ def create_message(stacks: List[Dict], result: List[Dict]) -> str:
         stack_name = item['StackName']
         resource_count = item['ResourceCount']
         message.append(f'- {resource_count:3}: {stack_name}')
+
+    message.append('----------------------------')
+    message.append(f'total stack: {len(stacks)}')
     return '\n'.join(message)
 
 def post_slack(message: str) -> None:
