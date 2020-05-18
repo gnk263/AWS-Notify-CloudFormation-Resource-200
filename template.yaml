@@ -14,7 +14,7 @@ Resources:
       CodeUri: hello_world/
       Handler: app.lambda_handler
       Runtime: python3.7
-      Timeout: 5
+      Timeout: 30
       Policies:
         - arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess
       Environment:
