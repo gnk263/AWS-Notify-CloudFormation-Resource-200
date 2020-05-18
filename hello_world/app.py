@@ -30,8 +30,13 @@ def lambda_handler(event, context) -> None:
 
 def get_stacks(token: str=None) -> List[Dict]:
     """スタック一覧を取得する"""
+    # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/APIReference/API_ListStacks.html
     option = {
-        'StackStatusFilter': ['CREATE_COMPLETE']
+        'StackStatusFilter': [
+            'CREATE_COMPLETE',
+            'UPDATE_COMPLETE',
+            'ROLLBACK_COMPLETE'
+        ]
     }
 
     if token is not None:
